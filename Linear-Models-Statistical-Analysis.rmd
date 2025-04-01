@@ -1,0 +1,254 @@
+---
+title: "Linear Models Statistical Analysis"
+author: "Hector Mathonsi"
+date: 01 April 2025
+output:
+    pdf_document:
+        toc: true
+        number_sections: true
+---
+
+\newpage
+
+# Introduction
+
+This document provides a comprehensive overview of linear models and their application in statistical analysis. It covers the theoretical foundations, practical applications, and interpretation of results from linear models. We will explore estimation techniques involving Newton-Raphson and Fisher scoring methods, as well as the use of R for implementing these models.
+
+A gauge length of 1 mm was utilized to measure the strength of single carbon fibers, and impregnated 1000-carbon fiber tows were measured in GPa, yielding the following data:
+
+# Data Preparation
+
+```{r}
+# import the data
+carbon_fiber_data <- c(
+  2.247, 2.64, 2.908, 3.099, 3.126, 3.245, 3.328, 3.355, 3.383, 3.572, 3.581, 3.681, 3.726,
+  3.727, 3.728, 3.783, 3.785, 3.786, 3.896, 3.912, 3.964, 4.05, 4.063, 4.082, 4.111, 4.118,
+  4.141, 4.246, 4.251, 4.262, 4.326, 4.402, 4.457, 4.466, 4.519, 4.542, 4.555, 4.614, 4.632,
+  4.634, 4.636, 4.678, 4.698, 4.738, 4.832, 4.924, 5.043, 5.099, 5.134, 5.359, 5.473, 5.571,
+  5.684, 5.721, 5.998, 6.06)
+knitr::kable(head(carbon_fiber_data), caption = "Carbon Fiber Data Overview")
+```
+
+# Data Exploration
+
+```{r}
+summary(carbon_fiber_data)
+```
+
+\newpage
+
+# Probability Density Function
+
+The formula for the probability density function is:
+
+\begin{equation} \label{eq:pdf}
+f(x;\beta) = \frac{2}{\beta} \exp \left(-\frac{x^2}{\beta}\right), 0 \leq x < \infty
+\end{equation}
+
+where:
+
+- $x$ is the random variable
+- $\beta$ is the scale parameter
+
+## Log-Likelihood Function
+
+The log-likelihood is given as:
+
+\begin{equation} \label{eq:log-likelihood}
+l(\beta; x_i) = n\log{\frac{2}{\beta}} - \frac{1}{\beta} \sum_{i = 1}^{n} x_i^2
+\end{equation}
+
+## Score Function
+
+The Score function is given as:
+
+\begin{equation} \label{eq:score_function}
+\frac{dl}{d\beta} = U = -\frac{n}{\beta} + \frac{1}{\beta^2} \sum_{i = 1}^{n} x_i^2
+\end{equation}
+
+## Derivative of the Score Function
+
+The derivative of the score function is given as:
+
+\begin{equation} \label{eq:d_score_function}
+\frac{dl}{d\beta} = U' = \frac{n}{\beta^2} - \frac{2}{\beta^3} \sum_{i = 1}^{n} x_i^2
+\end{equation}
+
+\newpage
+
+## R Implementation
+
+```{r}
+# pdf function
+pdf_function <- function(x, b) {
+  return (2/b * x * exp(-x^2/b))
+}
+
+# Log-Likelihood Function
+log_Likelihood_function <- function(n, b, x) {
+  return (n*log(2/b) - 1/b * sum(x^2))
+}
+
+# Score Function
+score_function <- function(n, b, x) {
+  return (-n/b + 1/b^2 * sum(x^2))
+}
+
+
+# Derivative of the Score Function
+d_score_function <- function(n, b, x) {
+  return (n/b^2 - 2/b^3 * sum(x^2))
+}
+```
+
+# Newton-Raphson Algorithm
+
+The Newton-Raphson algorithm is an iterative method for finding successively better approximations to the roots (or zeroes) of a real-valued function. The formula is given by:
+
+\begin{equation} \label{eq:newton_raphson}
+\beta^{(m)} = \beta^{(m - 1)} - \frac{U^{(m - 1)}}{U^{'(m - 1)}}
+\end{equation}
+
+
+
+```{r}
+# Newton-Raphson Algorithm
+newton_raphson <- function(b, U, d_U) {
+  return (b - U/d_U)
+}
+
+b <- mean(carbon_fiber_data)
+U <- score_function(length(carbon_fiber_data), b, carbon_fiber_data)
+d_U <- d_score_function(length(carbon_fiber_data), b, carbon_fiber_data)
+
+newton_table <- data.frame(
+  m = 0,
+  b = b,
+  U = U,
+  dU = d_U,
+  U_frac_dU = U/d_U
+
+)
+
+is_converge <- FALSE
+iteration_num <- 1
+max_iterations <- 100  # Prevent infinite loops
+
+
+while (!is_converge && iteration_num <= max_iterations) {
+    b <- newton_raphson(b, U, d_U)
+    U <- score_function(length(carbon_fiber_data), b, carbon_fiber_data)
+    d_U <- d_score_function(length(carbon_fiber_data), b, carbon_fiber_data)
+    new_iteration <- c(iteration_num, b, U, d_U, U/d_U)
+
+    if (round(b, 6) == round(newton_table$b[length(newton_table$b)], 6)) {
+      is_converge <- TRUE
+    }
+
+    newton_table <- rbind(newton_table, new_iteration)
+    iteration_num <- iteration_num + 1
+}
+
+knitr::kable(
+  newton_table,
+  caption = "Newton-Raphson Iteration Table",
+  col.names = c("Iteration(m)", "b", "U", "U'", "U/U'")
+)
+```
+
+# Method of Scoring
+
+The method of scoring is an iterative method for finding the maximum likelihood estimates of parameters in statistical models. The formula is given by:
+
+\begin{equation} \label{eq:method_scoring}
+\beta^{(m)} = \beta^{(m - 1)} + \frac{U^{(m - 1)}}{\gimel^{'(m - 1)}}
+\end{equation}
+
+where:
+
+- $\gimel = -E(U')$ is the Fisher information matrix
+
+In our case, the Fisher information matrix is given by:
+
+\begin{equation} \label{eq:fisher_information}
+\gimel = \frac{N}{\beta^2}
+\end{equation}
+
+```{r}
+# Fisher Information
+fisher_information <- function(N, b) {
+  return (N/b^2)
+}
+
+b <- mean(carbon_fiber_data)
+U <- score_function(length(carbon_fiber_data), b, carbon_fiber_data)
+d_U <- d_score_function(length(carbon_fiber_data), b, carbon_fiber_data)
+E_dU <- -fisher_information(length(carbon_fiber_data), b)
+
+newton_table_fisher <- data.frame(
+  m = 0,
+  b = b,
+  U = U,
+  dU = d_U,
+  E_dU = E_dU,
+  U_frac_dU = U/d_U,
+  U_frac_fisher = U/-E_dU
+)
+
+is_converge <- FALSE
+iteration_num <- 1
+max_iterations <- 100  # Prevent infinite loops
+
+
+while (!is_converge && iteration_num <= max_iterations) {
+  b <- newton_raphson(b, U, E_dU)
+  U <- score_function(length(carbon_fiber_data), b, carbon_fiber_data)
+  d_U <- d_score_function(length(carbon_fiber_data), b, carbon_fiber_data)
+  E_dU <- -fisher_information(length(carbon_fiber_data), b)
+  new_iteration <- c(iteration_num, b, U, d_U, E_dU, U/d_U, U/-E_dU)
+
+  if (round(b, 6) == round(newton_table_fisher$b[length(newton_table_fisher$b)], 6)) {
+    is_converge <- TRUE
+  }
+
+  newton_table_fisher <- rbind(newton_table_fisher, new_iteration)
+  iteration_num <- iteration_num + 1
+}
+
+knitr::kable(
+  newton_table_fisher,
+  caption = "Newton-Raphson Iteration Table",
+  col.names = c("Iteration(m)", "b", "U", "U'", "E(U')", "U/U'", "U/I")
+)
+```
+
+# Comparison of Methods (Newton-Raphson vs. Fisher Scoring)
+
+Newton-Raphson and Fisher scoring are two iterative methods used for finding maximum likelihood estimates. The key differences between the two methods are:
+
+- **Newton-Raphson**: Uses the second derivative (Hessian) of the log-likelihood function to update the parameter estimates. It can converge faster but may be less stable if the Hessian is not positive definite.
+- **Fisher Scoring**: Uses the Fisher information matrix (expected value of the second derivative) to update the parameter estimates. It is generally more stable and robust, especially in cases where the Hessian is not well-behaved.
+- **Convergence**: Both methods can converge to the maximum likelihood estimates, but the convergence speed and stability may vary depending on the specific problem and data. Fisher scoring is often preferred for its stability, while Newton-Raphson may be faster in some cases. From our case it only took 3 iterations to converge using Fisher scoring, while it took 8 to 9 iterations to converge using Newton-Raphson.
+
+# 95% Confidence Interval for $\beta$
+
+The 95% confidence interval for $\beta$ can be calculated using the formula:
+
+\begin{equation} \label{eq:95_confidence_interval}
+CL = \hat{\beta} \pm z_{\alpha/2} \times s.e(\hat{\beta})
+\end{equation}
+
+where:
+
+- $s.e(\hat{\beta}) = \sqrt{\frac{1}{\gimel}}$
+
+```{r}
+# 95% CL
+alpha <- 0.05
+b <- 18.814582
+critical_value <- abs(qnorm((alpha)/2))
+st_error <- sqrt(1/fisher_information(length(carbon_fiber_data), b))
+cat("CL = (", b-critical_value*st_error, ",", b+critical_value*st_error,")")
+```
+
+The 95% confidence interval for $\beta$ is approximately (13.88683, 23.74233). It provides a credible range of values $\beta$ based on observed data. The interval does not include zero, so we reject the null hypothesis at the 5% significance level. This suggests that the carbon fibers have a significant strength, as indicated by the positive estimate of $\beta$.
